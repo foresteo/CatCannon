@@ -5,10 +5,10 @@ const CANVAS_H = 450;
 const GROUND_Y = 370;
 
 const BASE = {
-  GRAVITY: 0.28,
-  BOUNCE_COEFF: 0.65,
-  SLIDE_COEFF: 0.92,
-  MAX_SPEED: 14,
+  GRAVITY: 0.10,
+  BOUNCE_COEFF: 0.72,
+  SLIDE_COEFF: 0.94,
+  MAX_SPEED: 10,
   MAGNET_RADIUS: 30,
 };
 
@@ -107,10 +107,10 @@ function spawnCoinsNear(obs) {
 }
 
 const OBSTACLE_ZONES = [
-  { minX: 300,  types: ['box', 'trampoline'] },
-  { minX: 600,  types: ['box', 'trampoline', 'leafblower', 'yarnball'] },
-  { minX: 2000, types: ['box', 'trampoline', 'leafblower', 'yarnball', 'dog', 'roomba', 'bucket'] },
-  { minX: 5000, types: ['box', 'trampoline', 'leafblower', 'yarnball', 'dog', 'roomba', 'bucket', 'rocket', 'catnip', 'splashpad'] },
+  { minX: 80,    types: ['box', 'trampoline'] },
+  { minX: 1500,  types: ['box', 'trampoline', 'leafblower', 'yarnball'] },
+  { minX: 5000,  types: ['box', 'trampoline', 'leafblower', 'yarnball', 'dog', 'roomba', 'bucket'] },
+  { minX: 10000, types: ['box', 'trampoline', 'leafblower', 'yarnball', 'dog', 'roomba', 'bucket', 'rocket', 'catnip', 'splashpad'] },
 ];
 
 function pickObstacleType(worldX) {
@@ -187,7 +187,7 @@ const Game = {
     this.particles = [];
     this.popups = [];
     this.sessionCoins = 0;
-    this.lastObstacleX = 300;
+    this.lastObstacleX = 80;
     this.comboCount = 0;
     this.comboTimer = 0;
     this.powerCharge = 0;
@@ -197,7 +197,7 @@ const Game = {
 
   handleInput(type, data) {
     if (this.state === 'MENU') {
-      if (type === 'mousedown') this.startRun();
+      if (type === 'mousedown') { Audio.init(); this.startRun(); }
       return;
     }
     if (this.state === 'RESULTS') {
@@ -297,14 +297,14 @@ const Game = {
 
     // Catnip boost
     if (cat.catnipTimer > 0) {
-      cat.vx *= 1.002;
-      cat.vy *= 0.97;
+      cat.vx *= 1.0008;
+      cat.vy *= 0.99;
       cat.catnipTimer--;
     }
 
     // Rocket
     if (cat.rocketTimer > 0) {
-      cat.vx += 0.35;
+      cat.vx += 0.20;
       cat.rocketTimer--;
       if (cat.rocketTimer === 0) {
         this.spawnParticles('explosion', cat.x, cat.y, 12);
@@ -314,15 +314,15 @@ const Game = {
 
     // Roomba
     if (cat.roombaTimer > 0) {
-      cat.vx = 5;
+      cat.vx = 4;
       cat.vy = 0;
       cat.y = GROUND_Y;
       cat.roombaTimer--;
-      if (cat.roombaTimer === 0) { cat.vy = -8; }
+      if (cat.roombaTimer === 0) { cat.vy = -6; }
     } else {
       // Leaf blower
       if (cat.leafBlowTimer > 0) {
-        cat.vx += cat.leafBlowDir * 0.18;
+        cat.vx += cat.leafBlowDir * 0.06;
         cat.leafBlowTimer--;
       }
       // Gravity
@@ -335,8 +335,11 @@ const Game = {
     if (cat.bucketTimer > 0) {
       cat.bucketTimer--;
       cat.vx = 0;
-      if (cat.bucketTimer === 0) cat.vy = -11;
+      if (cat.bucketTimer === 0) cat.vy = -8;
     }
+
+    // Impact flash decay
+    if (cat.impactFlash > 0) cat.impactFlash--;
 
     // Ground collision
     if (cat.y >= GROUND_Y) {
@@ -344,7 +347,7 @@ const Game = {
       const impactSpeed = Math.abs(cat.vy);
       if (impactSpeed > 1) {
         // Squash
-        const squash = Math.min(1.6, 1 + impactSpeed * 0.025);
+        const squash = Math.min(3.0, 1 + impactSpeed * 0.25);
         cat.scaleX = squash;
         cat.scaleY = 1 / squash;
         cat.angularVel += (cat.vx > 0 ? 1 : -1) * impactSpeed * 0.04;
@@ -400,8 +403,8 @@ const Game = {
     cat.rotation += cat.angularVel;
 
     // Scale spring back
-    cat.scaleX += (1 - cat.scaleX) * 0.18;
-    cat.scaleY += (1 - cat.scaleY) * 0.18;
+    cat.scaleX += (1 - cat.scaleX) * 0.04;
+    cat.scaleY += (1 - cat.scaleY) * 0.04;
 
     // Paw extend decay
     if (cat.pawExtend > 0) cat.pawExtend--;
@@ -412,8 +415,10 @@ const Game = {
     if (dist > this.bestDistance) this.bestDistance = dist;
     this.totalCoins += this.sessionCoins;
     this.save();
-    // Delay results screen slightly
-    setTimeout(() => { if (this.state === 'FLYING') this.state = 'RESULTS'; }, 800);
+    // Tired landing meow, then a second one
+    Audio.play('meow', 0);
+    setTimeout(() => Audio.play('meow', 0), 350);
+    setTimeout(() => { if (this.state === 'FLYING') this.state = 'RESULTS'; }, 900);
   },
 
   updateCamera() {
@@ -458,69 +463,83 @@ const Game = {
 
   applyObstacle(obs) {
     const cat = this.cat;
+    const impactSpd = Math.sqrt(cat.vx * cat.vx + cat.vy * cat.vy);
     switch (obs.type) {
       case 'box':
         this.spawnParticles('debris', obs.x + obs.w / 2, obs.y - obs.h / 2, 8);
-        cat.vy = -4;
+        cat.vy = -3;
         cat.vx *= 0.8;
         Audio.play('thud', 5);
+        Audio.play('meow', impactSpd);
         this.popups.push({ text: 'BONK!', x: obs.x, y: obs.y - obs.h - 20, life: 30, type: 'meow' });
         break;
       case 'trampoline': {
-        const boost = Math.max(Math.abs(cat.vy) * 1.8, 8);
+        const boost = Math.max(Math.abs(cat.vy) * 1.8, 6);
         cat.vy = -boost;
-        const stretch = Math.min(1.6, 1 + boost * 0.03);
+        const stretch = Math.min(3.0, 1 + boost * 0.20);
         cat.scaleY = stretch;
         cat.scaleX = 1 / stretch;
         Audio.play('boing', boost);
+        Audio.play('meow', boost * 4);
         this.popups.push({ text: 'BOING!', x: obs.x, y: obs.y - 30, life: 35, type: 'meow' });
         break;
       }
       case 'leafblower':
         cat.leafBlowDir = obs.direction;
         cat.leafBlowTimer = 50;
-        this.popups.push({ text: obs.direction > 0 ? 'WHOOSH!' : 'SWOOSH!', x: obs.x, y: obs.y - 50, life: 30, type: 'meow' });
         Audio.play('whoosh', 5);
+        Audio.play('meow', impactSpd);
+        this.popups.push({ text: obs.direction > 0 ? 'WHOOSH!' : 'SWOOSH!', x: obs.x, y: obs.y - 50, life: 30, type: 'meow' });
         break;
       case 'yarnball':
         cat.vx *= 0.55;
         Audio.play('thud', 3);
+        Audio.play('meow', impactSpd);
         this.popups.push({ text: 'GRAB!', x: obs.x, y: obs.y - 40, life: 30, type: 'meow' });
         break;
       case 'dog':
         cat.vx = -Math.abs(cat.vx) * 0.7;
-        cat.vy = -6;
+        cat.vy = -5;
         cat.angularVel += -0.3;
+        cat.impactFlash = 40;
         Audio.play('bark', 8);
+        Audio.play('meow', 12);
         this.popups.push({ text: 'WOOF!', x: obs.x, y: obs.y - 50, life: 40, type: 'meow' });
-        this.shakeRequest = 6;
+        this.shakeRequest = 5;
         break;
       case 'roomba':
         cat.roombaTimer = 60;
         cat.y = GROUND_Y;
-        this.popups.push({ text: 'VRRRM!', x: obs.x, y: obs.y - 30, life: 30, type: 'meow' });
         Audio.play('whoosh', 3);
+        Audio.play('meow', impactSpd);
+        this.popups.push({ text: 'VRRRM!', x: obs.x, y: obs.y - 30, life: 30, type: 'meow' });
         break;
       case 'bucket':
         cat.bucketTimer = 50;
         cat.vx = 0;
-        this.popups.push({ text: 'CLONK!', x: obs.x, y: obs.y - 50, life: 35, type: 'meow' });
+        cat.impactFlash = 50;
         Audio.play('thud', 6);
+        Audio.play('meow', 8);
+        this.popups.push({ text: 'CLONK!', x: obs.x, y: obs.y - 50, life: 35, type: 'meow' });
         break;
       case 'rocket':
         cat.rocketTimer = 90;
+        cat.impactFlash = 30;
         Audio.play('rocket', 10);
+        Audio.play('meow', 14);
         this.popups.push({ text: '🚀 ZOOM!', x: cat.x, y: cat.y - 50, life: 50, type: 'combo' });
         break;
       case 'catnip':
         cat.catnipTimer = 120;
         Audio.play('meow', 15);
+        setTimeout(() => Audio.play('meow', 18), 200);
         this.popups.push({ text: 'CATNIP!!!', x: obs.x, y: obs.y - 50, life: 50, type: 'combo' });
         break;
       case 'splashpad':
-        cat.vy = -16;
-        cat.vx += Math.sign(cat.vx || 1) * 5;
+        cat.vy = -10;
+        cat.vx += Math.sign(cat.vx || 1) * 2.5;
         Audio.play('splash', 8);
+        Audio.play('meow', 10);
         this.popups.push({ text: 'HISSSS!', x: obs.x + obs.w / 2, y: obs.y - 30, life: 40, type: 'meow' });
         this.spawnParticles('splash', obs.x + obs.w / 2, obs.y - obs.h, 10);
         break;

@@ -32,10 +32,10 @@ MENU → AIMING → FLYING → RESULTS → SHOP → AIMING
 
 | Constant | Value | Role |
 |----------|-------|------|
-| GRAVITY | 0.4 px/frame² | Downward acceleration every frame |
-| BOUNCE_COEFF | 0.55 | `vy_new = -vy * BOUNCE_COEFF` on ground hit |
-| SLIDE_COEFF | 0.92 | `vx *= SLIDE_COEFF` per frame while on ground (< 1 = friction) |
-| MAX_SPEED | 22 px/frame | Maximum launch speed at full charge |
+| GRAVITY | 0.10 px/frame² | Downward acceleration every frame |
+| BOUNCE_COEFF | 0.72 | `vy_new = -vy * BOUNCE_COEFF` on ground hit |
+| SLIDE_COEFF | 0.94 | `vx *= SLIDE_COEFF` per frame while on ground (< 1 = friction) |
+| MAX_SPEED | 10 px/frame | Maximum launch speed at full charge |
 
 World coordinates: ground at y=370 in an 800×450 viewport.
 
@@ -47,9 +47,9 @@ World coordinates: ground at y=370 in an 800×450 viewport.
 - Decays: `angularVel *= 0.95` per frame
 
 ### Squash-and-stretch (jello physics):
-- Ground impact: `scaleX = 1 + abs(vy)*0.025`, `scaleY = 1/scaleX`
+- Ground impact: `scaleX = 1 + abs(vy)*0.08`, `scaleY = 1/scaleX`
 - Launch/trampoline: `scaleY = 1 + abs(vy)*0.03`, `scaleX = 1/scaleY`
-- Spring back: `scale += (1 - scale) * 0.18` per axis per frame
+- Spring back: `scale += (1 - scale) * 0.08` per axis per frame
 
 ---
 
@@ -60,6 +60,8 @@ World coordinates: ground at y=370 in an 800×450 viewport.
 | Mouse move (AIMING) | Rotate cannon barrel toward mouse, clamped to -80°…-10° |
 | Mouse hold (AIMING) | Charge power bar 0→1 over 1.5 seconds |
 | Mouse release (AIMING) | Launch: `vx = cos(angle)*charge*MAX_SPEED`, `vy = sin(angle)*charge*MAX_SPEED` |
+
+The cannon is fixed at **world x=80**. It scrolls off-screen left once the cat is airborne — it does not follow the camera.
 
 ---
 
@@ -91,25 +93,25 @@ World coordinates: ground at y=370 in an 800×450 viewport.
 
 | Zone | Start X | Available obstacles |
 |------|---------|-------------------|
-| 1 | 300 | box, trampoline |
-| 2 | 600 | + leafblower, yarnball |
-| 3 | 2000 | + dog, roomba, bucket |
-| 4 | 5000 | + rocket, catnip, splashpad |
+| 1 | 80 | box, trampoline |
+| 2 | 1500 | + leafblower, yarnball |
+| 3 | 5000 | + dog, roomba, bucket |
+| 4 | 10000 | + rocket, catnip, splashpad |
 
 ### Obstacle Specs
 
 | Type | Trigger | Effect | Sound | Popup |
 |------|---------|--------|-------|-------|
-| **Box** | first contact | Shatters; `vy = -4, vx *= 0.8` | thud | BONK! |
-| **Trampoline** | first contact | `vy = -max(abs(vy)*1.8, 12)` + stretch | boing | BOING! |
-| **Leaf Blower** | first contact | Sets 30-frame push: `vx += dir*0.4/frame` | whoosh | WHOOSH!/SWOOSH! |
-| **Yarn Ball** | first contact | `vx *= 0.55`, paws extend | thud | GRAB! |
-| **Dog** | first contact | `vx = -abs(vx)*0.7, vy = -6` (reversal) | bark | WOOF! |
-| **Roomba** | first contact | Locks cat to ground, `vx = 5` for 60 frames, then `vy = -8` | whoosh | VRRRM! |
-| **Bucket** | first contact | Freezes cat 50 frames, then `vy = -11` | thud | CLONK! |
-| **Rocket** | first contact | 90 frames: `vx += 0.7/frame`, then explosion | rocket | 🚀 ZOOM! |
-| **Catnip** | first contact | 120 frames: `vx *= 1.004/frame` (speed frenzy) | meow | CATNIP!!! |
-| **Splash Pad** | first contact | Cat hates water: `vy = -16, vx += sign(vx)*5` | splash | HISSSS! |
+| **Box** | first contact | Shatters; `vy = -3, vx *= 0.8` | thud + meow | BONK! |
+| **Trampoline** | first contact | `vy = -max(abs(vy)*1.8, 6)` + stretch + meow | boing + meow | BOING! |
+| **Leaf Blower** | first contact | Sets 50-frame push: `vx += dir*0.06/frame` | whoosh + meow | WHOOSH!/SWOOSH! |
+| **Yarn Ball** | first contact | `vx *= 0.55`, paws extend | thud + meow | GRAB! |
+| **Dog** | first contact | `vx = -abs(vx)*0.7, vy = -5`, impactFlash 40f | bark + meow | WOOF! |
+| **Roomba** | first contact | Locks cat to ground, `vx = 4` for 60 frames, then `vy = -6` | whoosh + meow | VRRRM! |
+| **Bucket** | first contact | Freezes cat 50 frames, then `vy = -8`, impactFlash 50f | thud + meow | CLONK! |
+| **Rocket** | first contact | 90 frames: `vx += 0.20/frame`, then explosion, impactFlash | rocket + meow | 🚀 ZOOM! |
+| **Catnip** | first contact | 120 frames: `vx *= 1.0008/frame` (speed frenzy) | meow × 2 | CATNIP!!! |
+| **Splash Pad** | first contact | Cat hates water: `vy = -10, vx += sign(vx)*2.5` | splash + meow | HISSSS! |
 
 All obstacles trigger only once (first collision). Multi-frame effects use timers updated in the physics step.
 
@@ -143,10 +145,14 @@ Five upgrades, five levels each. Costs double per level.
 ## Audio Design
 
 All sounds synthesized (no audio files). Reference implementation uses Web Audio API oscillators.
+AudioContext is initialized on the first user gesture (MENU click) so it is running before the first sound fires. All tones and noise schedule start inside a `ctx.resume().then(...)` call to prevent silent playback in suspended contexts.
+Every obstacle hit plays a meow alongside its primary sound. End-of-run plays two soft low-pitched meows (speed=0) in sequence.
 
 | Event | Type | Freq | Notes |
 |-------|------|------|-------|
-| Ground bounce / meow | Triangle | `200 + abs(vy)*8` Hz | Pitch rises with speed |
+| Ground bounce / meow | Triangle | `200 + abs(vy)*8` Hz | Pitch rises with speed; gain 0.5, 0.30s |
+| Obstacle hit meow | Triangle | `200 + impactSpeed*8` Hz | Layered on top of primary sound |
+| End-of-run meow × 2 | Triangle | 200 Hz (tired) | 350ms apart |
 | Trampoline boing | Sine | 180 → 420 Hz ramp | |
 | Box hit / thud | Noise + sawtooth | 80 → 40 Hz | |
 | Dog bark | Sawtooth | 120 → 80 Hz × 2 pulses | |
@@ -163,12 +169,16 @@ All sounds synthesized (no audio files). Reference implementation uses Web Audio
 Single rigid boxy shape — head and body are one rounded square (~40×40px).
 - **Body**: rounded square, orange/amber fill, dark stroke
 - **Ears**: two filled triangles from top corners; pink inner triangle
-- **Eyes**: oval (normal), slits (squash impact), ×× (fast collision), closed arcs (stopped/sleeping)
+- **Eyes**: oval (normal), slits (squash on ground hit), dizzy spirals (impactFlash > 0), closed arcs (stopped/sleeping)
+- **Dizzy eye**: two concentric arc rings (inner r=1.8, outer r=3.8) in purple, offset start angles for swirl look; centre dot
 - **Nose**: pink/salmon small triangle
 - **Whiskers**: 3 lines each side from nose
 - **Tail**: bezier curve, oscillates `sin(time*0.08)*0.5` while airborne; limp when stopped
 - **Paws**: 4 small rounded rects, extend from bottom on obstacle contact, fade over 18 frames
 - Entire cat rotates as one rigid body via angular velocity
+
+### impactFlash
+`cat.impactFlash` (frame countdown) triggers dizzy eyes. Set on traumatic hits only: dog (40f), bucket (50f), rocket (30f). Routine contacts (ground bounces, box, splash pad) do NOT set impactFlash. Decrements each frame in `updateCat`.
 
 ### Screen Shake
 - On launch: magnitude 8

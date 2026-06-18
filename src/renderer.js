@@ -97,9 +97,11 @@ const Renderer = (() => {
     const half = size / 2;
 
     ctx.save();
-    ctx.translate(sx, sy - half);
-    ctx.rotate(cat.rotation);
+    // Scale before rotate so squash/stretch is axis-aligned in world space,
+    // not locked to the cat's spinning local frame.
+    ctx.translate(sx, sy - half * cat.scaleY);
     ctx.scale(cat.scaleX, cat.scaleY);
+    ctx.rotate(cat.rotation);
 
     // Tail
     const tailAngle = cat.stopped ? 0.4 : Math.sin(time * 0.08) * 0.5 + 0.3;
@@ -162,8 +164,6 @@ const Renderer = (() => {
     ctx.fill();
 
     // Eyes
-    const speed = Math.sqrt(cat.vx * cat.vx + cat.vy * cat.vy);
-    const isFast = speed > 14;
     const isImpact = cat.impactFlash > 0;
     const isSleeping = cat.stopped;
 
@@ -171,7 +171,7 @@ const Renderer = (() => {
     const eyeLX = -10, eyeRX = 10;
 
     if (isSleeping) {
-      // Closed eyes (sleeping lines)
+      // Closed eyes (sleeping arcs)
       ctx.strokeStyle = '#3a1a00';
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
@@ -181,14 +181,30 @@ const Renderer = (() => {
       ctx.beginPath();
       ctx.arc(eyeRX, eyeRY, 5, Math.PI * 0.1, Math.PI * 0.9);
       ctx.stroke();
-    } else if (isFast || isImpact) {
-      // ×× eyes
-      ctx.strokeStyle = '#3a1a00';
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = 'round';
+    } else if (isImpact) {
+      // Dizzy spiral eyes
       for (const [ex, ey] of [[eyeLX, eyeLY], [eyeRX, eyeRY]]) {
-        ctx.beginPath(); ctx.moveTo(ex - 5, ey - 5); ctx.lineTo(ex + 5, ey + 5); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(ex + 5, ey - 5); ctx.lineTo(ex - 5, ey + 5); ctx.stroke();
+        // White eye base
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(ex, ey, 6, 0, Math.PI * 2);
+        ctx.fill();
+        // Inner spiral ring
+        ctx.strokeStyle = '#7722cc';
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(ex, ey, 1.8, 0, Math.PI * 1.7);
+        ctx.stroke();
+        // Outer spiral ring (offset start for swirl feel)
+        ctx.beginPath();
+        ctx.arc(ex, ey, 3.8, Math.PI * 0.4, Math.PI * 2.2);
+        ctx.stroke();
+        // Centre dot
+        ctx.fillStyle = '#3a1a00';
+        ctx.beginPath();
+        ctx.arc(ex, ey, 1, 0, Math.PI * 2);
+        ctx.fill();
       }
     } else {
       // Normal oval eyes
@@ -254,8 +270,8 @@ const Renderer = (() => {
 
   // ── Cannon ─────────────────────────────────────────────────────────────────
 
-  function drawCannon(angle, charge, state) {
-    const bx = 80, by = GROUND_Y;
+  function drawCannon(angle, charge, state, cameraX) {
+    const bx = 80 - cameraX, by = GROUND_Y;
 
     ctx.save();
     ctx.translate(bx, by);
@@ -987,7 +1003,7 @@ const Renderer = (() => {
     for (const obs of game.obstacles) drawObstacle(obs, cx, game.time);
 
     drawCat(game.cat, cx, game.time);
-    drawCannon(game.cannonAngle, game.powerCharge, game.state);
+    drawCannon(game.cannonAngle, game.powerCharge, game.state, cx);
     drawPopups(game.popups, cx);
     drawHUD(game);
 

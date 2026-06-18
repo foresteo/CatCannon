@@ -58,5 +58,9 @@ All live in `BASE` (game-state.js). `Game.recomputeStats()` applies upgrade delt
 ### Audio
 `Audio.play(sound, speed)` — `speed` is used to pitch-shift meows. All sounds are synthesized via Web Audio oscillators; no audio files. The context is created on first user gesture to comply with browser autoplay policy.
 
+## Git / Commits
+
+**Never commit or tag without explicit user approval.** After making changes, show what you did and ask whether to commit — do not run `git commit` or `git tag` automatically.
+
 ## Reference
 `GAME_DESIGN.md` is the platform-agnostic design document — obstacle specs, physics constant roles, upgrade balance rationale, and the full state machine. Read it before making gameplay changes.
