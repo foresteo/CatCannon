@@ -5,10 +5,10 @@ const CANVAS_H = 450;
 const GROUND_Y = 370;
 
 const BASE = {
-  GRAVITY: 0.4,
-  BOUNCE_COEFF: 0.55,
+  GRAVITY: 0.28,
+  BOUNCE_COEFF: 0.65,
   SLIDE_COEFF: 0.92,
-  MAX_SPEED: 22,
+  MAX_SPEED: 14,
   MAGNET_RADIUS: 30,
 };
 
@@ -297,14 +297,14 @@ const Game = {
 
     // Catnip boost
     if (cat.catnipTimer > 0) {
-      cat.vx *= 1.004;
+      cat.vx *= 1.002;
       cat.vy *= 0.97;
       cat.catnipTimer--;
     }
 
     // Rocket
     if (cat.rocketTimer > 0) {
-      cat.vx += 0.7;
+      cat.vx += 0.35;
       cat.rocketTimer--;
       if (cat.rocketTimer === 0) {
         this.spawnParticles('explosion', cat.x, cat.y, 12);
@@ -322,7 +322,7 @@ const Game = {
     } else {
       // Leaf blower
       if (cat.leafBlowTimer > 0) {
-        cat.vx += cat.leafBlowDir * 0.4;
+        cat.vx += cat.leafBlowDir * 0.18;
         cat.leafBlowTimer--;
       }
       // Gravity
@@ -467,7 +467,7 @@ const Game = {
         this.popups.push({ text: 'BONK!', x: obs.x, y: obs.y - obs.h - 20, life: 30, type: 'meow' });
         break;
       case 'trampoline': {
-        const boost = Math.max(Math.abs(cat.vy) * 1.8, 12);
+        const boost = Math.max(Math.abs(cat.vy) * 1.8, 8);
         cat.vy = -boost;
         const stretch = Math.min(1.6, 1 + boost * 0.03);
         cat.scaleY = stretch;
@@ -478,7 +478,7 @@ const Game = {
       }
       case 'leafblower':
         cat.leafBlowDir = obs.direction;
-        cat.leafBlowTimer = 30;
+        cat.leafBlowTimer = 50;
         this.popups.push({ text: obs.direction > 0 ? 'WHOOSH!' : 'SWOOSH!', x: obs.x, y: obs.y - 50, life: 30, type: 'meow' });
         Audio.play('whoosh', 5);
         break;
